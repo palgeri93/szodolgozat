@@ -3,68 +3,159 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Angol Szógyakorló</title>
+  <title>Online szódolgozat – tanár/tanuló</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- SheetJS (XLSX parser) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
+
 <body class="bg-slate-50 text-slate-900">
-  <div class="max-w-3xl mx-auto p-4 sm:p-8">
-    <h1 class="text-2xl font-bold mb-2">Angol szavak gyakorlása</h1>
-    <p class="text-slate-600 mb-6">Forrás: <code class="bg-slate-200 px-1 rounded">data/szavak.xlsx</code></p>
+  <div class="max-w-5xl mx-auto p-4 sm:p-8">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold">Online szódolgozat</h1>
+        <p class="text-slate-600">Forrás: <code class="bg-slate-200 px-1 rounded">data/szavak.xlsx</code></p>
+      </div>
+
+      <!-- API base -->
+      <div class="bg-white rounded-2xl shadow p-4 w-full sm:w-[420px]">
+        <label class="block text-sm font-semibold mb-2">Backend API címe</label>
+        <input id="apiBaseInput" class="w-full border rounded-lg p-2" placeholder="http://localhost:3000" />
+        <div class="text-xs text-slate-500 mt-2">
+          Helyi futtatásnál: <code>http://localhost:3000</code>
+        </div>
+      </div>
+    </div>
 
     <div id="status" class="p-3 rounded bg-amber-100 text-amber-900 mb-4 hidden"></div>
 
-    <div class="grid gap-4 sm:grid-cols-2 mb-6">
+    <!-- Role switch -->
+    <div class="flex gap-2 mb-4">
+      <button id="roleStudentBtn" class="px-4 py-2 rounded-xl font-semibold bg-slate-900 text-white">Tanuló</button>
+      <button id="roleTeacherBtn" class="px-4 py-2 rounded-xl font-semibold bg-slate-200 hover:bg-slate-300">Tanár</button>
+    </div>
+
+    <!-- Teacher panel -->
+    <div id="teacherPanel" class="bg-white rounded-2xl shadow p-4 mb-6 hidden">
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="sm:col-span-1">
+          <div class="font-bold mb-2">Tanári belépés</div>
+          <label class="block text-sm font-semibold mb-2">Tanári jelszó</label>
+          <input id="teacherPassword" type="password" class="w-full border rounded-lg p-2" placeholder="jelszó" />
+          <button id="teacherLoginBtn" class="mt-3 w-full bg-slate-900 text-white rounded-xl py-2 font-semibold hover:bg-slate-800">
+            Belépés
+          </button>
+
+          <div id="teacherAuthed" class="mt-3 text-sm text-emerald-700 hidden">
+            ✓ Bejelentkezve
+          </div>
+
+          <hr class="my-4" />
+
+          <div class="font-bold mb-2">Tanulói kód</div>
+          <div class="flex gap-2">
+            <input id="studentCode" class="flex-1 border rounded-lg p-2" placeholder="pl. ABC123" />
+            <button id="genCodeBtn" class="px-3 rounded-xl bg-slate-200 hover:bg-slate-300 font-semibold">Generál</button>
+          </div>
+
+          <label class="block text-sm font-semibold mt-4 mb-2">Időlimit (perc)</label>
+          <input id="timeLimitMin" type="number" min="1" value="5" class="w-full border rounded-lg p-2" />
+
+          <button id="publishSessionBtn" class="mt-4 w-full bg-emerald-600 text-white rounded-xl py-2 font-semibold hover:bg-emerald-500">
+            Beállítások hozzárendelése a kódhoz
+          </button>
+
+          <button id="downloadXlsxBtn" class="mt-3 w-full bg-indigo-600 text-white rounded-xl py-2 font-semibold hover:bg-indigo-500">
+            Eredmények letöltése (.xlsx)
+          </button>
+
+          <div class="text-xs text-slate-500 mt-2">
+            A letöltés tanári tokennel védett.
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <div class="font-bold mb-2">Dolgozat beállításai (tanár)</div>
+          <div class="text-sm text-slate-600 mb-3">
+            Válaszd ki az évfolyamot, leckét, intervallumot, feladattípust és kérdésszámot, majd mentsd a kódhoz.
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Évfolyam (munkalap)</label>
+              <select id="gradeSelect" class="w-full border rounded-lg p-2"></select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Lecke</label>
+              <select id="lessonSelect" class="w-full border rounded-lg p-2"></select>
+              <div class="mt-2 text-sm text-slate-600">
+                Szavak száma a leckében: <b id="lessonCount">—</b>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-semibold mb-2">Hanyadik szótól</label>
+                <input id="rangeFrom" type="number" min="1" class="w-full border rounded-lg p-2" value="1" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-2">Hanyadik szóig</label>
+                <input id="rangeTo" type="number" min="1" class="w-full border rounded-lg p-2" value="1" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Feladattípus</label>
+              <select id="modeSelect" class="w-full border rounded-lg p-2">
+                <option value="HU_TO_EN_TYPE">Magyar szót mutat – írd le angolul</option>
+                <option value="HU_TO_EN_MC">Magyar szót mutat – válaszd ki az angolt (4 opció)</option>
+                <option value="EN_TO_HU_MC">Angol szót mutat – válaszd ki a magyart (4 opció)</option>
+                <option value="RANDOM_MIX">Random (a 3 feladattípus keverve)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-2 mt-7">
+              <input id="noRepeatToggle" type="checkbox" class="h-4 w-4" />
+              <label for="noRepeatToggle" class="text-sm font-semibold">
+                Csak egyszer kérdezze ugyanazt (ha lehet)
+              </label>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Kérdések száma</label>
+              <input id="countInput" type="number" min="1" value="10" class="w-full border rounded-lg p-2" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student + Quiz -->
+    <div class="grid gap-4 sm:grid-cols-2">
       <div class="bg-white rounded-2xl shadow p-4">
-        <label class="block text-sm font-semibold mb-2">Név</label>
+        <div class="font-bold mb-2">Tanuló</div>
+
+        <label class="block text-sm font-semibold mb-2">Tanulói kód</label>
+        <div class="flex gap-2">
+          <input id="studentCodeInput" class="flex-1 border rounded-lg p-2" placeholder="pl. ABC123" />
+          <button id="loadConfigBtn" class="px-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800">
+            Kód betöltése
+          </button>
+        </div>
+
+        <label class="block text-sm font-semibold mt-4 mb-2">Név</label>
         <input id="nameInput" class="w-full border rounded-lg p-2" placeholder="Pl. Anna" />
 
-        <label class="block text-sm font-semibold mt-4 mb-2">Évfolyam (munkalap)</label>
-        <select id="gradeSelect" class="w-full border rounded-lg p-2"></select>
-
-        <label class="block text-sm font-semibold mt-4 mb-2">Lecke</label>
-        <select id="lessonSelect" class="w-full border rounded-lg p-2"></select>
-
-        <div class="mt-2 text-sm text-slate-600">
-          Szavak száma a leckében: <b id="lessonCount">—</b>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3 mt-4">
-          <div>
-            <label class="block text-sm font-semibold mb-2">Hanyadik szótól</label>
-            <input id="rangeFrom" type="number" min="1" class="w-full border rounded-lg p-2" value="1" />
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-2">Hanyadik szóig</label>
-            <input id="rangeTo" type="number" min="1" class="w-full border rounded-lg p-2" value="1" />
-          </div>
-        </div>
-
-        <label class="block text-sm font-semibold mt-4 mb-2">Feladattípus</label>
-        <select id="modeSelect" class="w-full border rounded-lg p-2">
-          <option value="HU_TO_EN_TYPE">Magyar szót mutat – írd le angolul</option>
-          <option value="HU_TO_EN_MC">Magyar szót mutat – válaszd ki az angolt (4 opció)</option>
-          <option value="EN_TO_HU_MC">Angol szót mutat – válaszd ki a magyart (4 opció)</option>
-          <option value="RANDOM_MIX">Random (a 3 feladattípus keverve)</option>
-        </select>
-
-        <div class="mt-4 flex items-center gap-2">
-          <input id="noRepeatToggle" type="checkbox" class="h-4 w-4" />
-          <label for="noRepeatToggle" class="text-sm font-semibold">
-            Csak egyszer kérdezze ugyanazt (ha lehet)
-          </label>
-        </div>
-
-        <label class="block text-sm font-semibold mt-4 mb-2">Kérdések száma</label>
-        <input id="countInput" type="number" min="1" value="10" class="w-full border rounded-lg p-2" />
-
-        <button id="startBtn" class="mt-4 w-full bg-slate-900 text-white rounded-xl py-2 font-semibold hover:bg-slate-800">
+        <button id="startBtn" class="mt-4 w-full bg-emerald-600 text-white rounded-xl py-2 font-semibold hover:bg-emerald-500">
           Indítás
         </button>
 
         <div class="mt-4 text-sm text-slate-600">
           Legutóbbi eredmény név alapján: <b id="lastScoreLine">—</b>
+        </div>
+
+        <div class="mt-4 text-xs text-slate-500">
+          A tanuló nem állít semmit: a kódhoz rendelt beállítások alapján indul a teszt.
         </div>
       </div>
 
@@ -92,8 +183,8 @@
           <div class="text-xl font-bold mb-4" id="prompt">—</div>
 
           <div id="typeAnswerArea" class="hidden">
-            <input id="textAnswer" class="w-full border rounded-lg p-2" placeholder="Írd be az angol szót..." />
-            <button id="submitTextBtn" class="mt-3 w-full bg-emerald-600 text-white rounded-xl py-2 font-semibold hover:bg-emerald-500">
+            <input id="textAnswer" class="w-full border rounded-lg p-2" placeholder="Írd be a választ..." />
+            <button id="submitTextBtn" class="mt-3 w-full bg-slate-900 text-white rounded-xl py-2 font-semibold hover:bg-slate-800">
               Ellenőrzés
             </button>
           </div>
@@ -113,13 +204,13 @@
         </div>
 
         <div id="idleArea" class="text-slate-600">
-          Add meg a neved, válassz évfolyamot, leckét, intervallumot és feladattípust, majd nyomj <b>Indítás</b>-t.
+          Tanuló módban: add meg a kódot → <b>Kód betöltése</b> → add meg a neved → <b>Indítás</b>.
         </div>
       </div>
     </div>
 
-    <div class="text-xs text-slate-500">
-      Tipp: GitHub Pages-en az Excel betöltése a repóból történik. Ha 404-et kapsz, ellenőrizd az útvonalat: <code>data/szavak.xlsx</code>.
+    <div class="text-xs text-slate-500 mt-6">
+      Tipp: Ha az Excel nem tölt be, ellenőrizd: <code>data/szavak.xlsx</code> tényleg létezik-e.
     </div>
   </div>
 
