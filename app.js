@@ -4,7 +4,7 @@ const EXCEL_PATH = "data/szavak.xlsx";
 const SCORE_KEY = "vocabTrainerScores_v1"; // localStorage kulcs
 
 // Backend API (GitHub Pages -> külön backend). Állítható a UI-ban is.
-let API_BASE = "http://localhost:3000";
+let API_BASE = "http://szodolgozat.onrender.com/";
 
 // Auth/session
 let teacherToken = null;
